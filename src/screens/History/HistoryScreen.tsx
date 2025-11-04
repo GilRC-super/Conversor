@@ -1,28 +1,74 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from 'react-native';
-
-interface HistoryItem {
-  id: string;
-  date: string;
-  from: string;
-  to: string;
-  amount: string;
-  result: string;
-}
+import React, { useState, useEffect } from 'react'; // ← Agregar useEffect
+import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
+import { getConversions, deleteConversion, clearConversions, Conversion } from '../../services/storage'; // ← NUEVO
+import { useFocusEffect } from '@react-navigation/native'; // ← NUEVO
 
 export function HistoryScreen() {
-  const [history] = useState<HistoryItem[]>([
-    { id: '1', date: '2025-10-04 14:30', from: 'USD', to: 'EUR', amount: '100', result: '92.00' },
-    { id: '2', date: '2025-10-04 12:15', from: 'EUR', to: 'MXN', amount: '50', result: '935.87' },
-    { id: '3', date: '2025-10-03 18:45', from: 'GBP', to: 'USD', amount: '200', result: '253.16' },
-    { id: '4', date: '2025-10-03 10:20', from: 'MXN', to: 'USD', amount: '1000', result: '58.14' },
-    { id: '5', date: '2025-10-02 16:30', from: 'USD', to: 'JPY', amount: '75', result: '11212.50' },
-  ]);
+  const [history, setHistory] = useState<Conversion[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const renderItem = ({ item }: { item: HistoryItem }) => (
+  // ✅ NUEVO: Cargar historial cuando se enfoca la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      loadHistory();
+    }, [])
+  );
+
+  const loadHistory = async () => {
+    setLoading(true);
+    const conversions = await getConversions();
+    setHistory(conversions);
+    setLoading(false);
+  };
+
+  // ✅ NUEVO: Eliminar una conversión
+  const handleDelete = (id: string) => {
+    Alert.alert(
+      'Eliminar conversión',
+      '¿Estás seguro de que quieres eliminar esta conversión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            const deleted = await deleteConversion(id);
+            if (deleted) {
+              loadHistory(); // Recargar lista
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // ✅ NUEVO: Limpiar todo el historial
+  const handleClearAll = () => {
+    Alert.alert(
+      'Limpiar historial',
+      '¿Estás seguro de que quieres eliminar todo el historial?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpiar',
+          style: 'destructive',
+          onPress: async () => {
+            const cleared = await clearConversions();
+            if (cleared) {
+              loadHistory();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderItem = ({ item }: { item: Conversion }) => (
     <View style={styles.historyCard}>
       <View style={styles.dateContainer}>
-        <Text style={styles.date}>📅 {item.date}</Text>
+        <Text style={styles.date}>
+          📅 {new Date(item.date).toLocaleString('es-MX')}
+        </Text>
       </View>
       <View style={styles.conversionRow}>
         <View style={styles.conversionItem}>
@@ -34,17 +80,47 @@ export function HistoryScreen() {
           <Text style={styles.result}>{item.result}</Text>
           <Text style={styles.currency}>{item.to}</Text>
         </View>
+        {/* ✅ NUEVO: Botón eliminar */}
+        <TouchableOpacity
+          onPress={() => handleDelete(item.id)}
+          style={styles.deleteButton}
+        >
+          <Text style={styles.deleteText}>🗑️</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.title}>📊 Historial de Conversiones</Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Cargando...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>📊 Historial de Conversiones</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>📊 Historial de Conversiones</Text>
+        {/* ✅ NUEVO: Botón limpiar todo */}
+        {history.length > 0 && (
+          <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
+            <Text style={styles.clearButtonText}>Limpiar Todo</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {history.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>📭</Text>
           <Text style={styles.emptyText}>No hay conversiones recientes</Text>
+          <Text style={styles.emptySubtext}>
+            Realiza tu primera conversión para verla aquí
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -58,17 +134,33 @@ export function HistoryScreen() {
   );
 }
 
+// Agregar nuevos estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2c3e50',
-    padding: 20,
-    textAlign: 'center',
+  },
+  clearButton: {
+    backgroundColor: '#e74c3c',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
   listContainer: {
     padding: 20,
@@ -120,6 +212,13 @@ const styles = StyleSheet.create({
     color: '#3498db',
     marginHorizontal: 10,
   },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 10,
+  },
+  deleteText: {
+    fontSize: 20,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -132,5 +231,10 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#7f8c8d',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#95a5a6',
+    marginTop: 10,
   },
 });

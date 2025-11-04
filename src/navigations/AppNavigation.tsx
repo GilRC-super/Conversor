@@ -7,12 +7,21 @@ import { HistoryScreen } from '../screens/History';
 import { RatesScreen } from '../screens/Rates';
 import { SettingsScreen } from '../screens/Settings';
 
-const Stack = createNativeStackNavigator();
+// Definir los tipos de las rutas
+export type RootStackParamList = {
+  HomeScreen: undefined;
+  ConvertScreen: undefined;
+  HistoryScreen: undefined;
+  RatesScreen: undefined;
+  SettingsScreen: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function AppNavigation() {
   return (
     <Stack.Navigator
-      initialRouteName={screens.home}
+      initialRouteName="HomeScreen"
       screenOptions={{
         headerStyle: {
           backgroundColor: '#3498db',
@@ -21,32 +30,49 @@ export function AppNavigation() {
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerShadowVisible: true,
+        animation: 'slide_from_right',
       }}
     >
       <Stack.Screen
-        name={screens.home}
+        name="HomeScreen"
         component={HomeScreen}
-        options={{ headerShown: false }}
+        options={{ 
+          headerShown: false,
+          title: 'Inicio'
+        }}
       />
       <Stack.Screen
-        name={screens.convert}
+        name="ConvertScreen"
         component={ConvertScreen}
-        options={{ title: 'Convertir' }}
+        options={{ 
+          title: 'Convertir Divisas',
+          headerBackTitle: 'Atrás'
+        }}
       />
       <Stack.Screen
-        name={screens.history}
+        name="HistoryScreen"
         component={HistoryScreen}
-        options={{ title: 'Historial' }}
+        options={{ 
+          title: 'Historial',
+          headerBackTitle: 'Atrás'
+        }}
       />
       <Stack.Screen
-        name={screens.rates}
+        name="RatesScreen"
         component={RatesScreen}
-        options={{ title: 'Tasas' }}
+        options={{ 
+          title: 'Tasas de Cambio',
+          headerBackTitle: 'Atrás'
+        }}
       />
       <Stack.Screen
-        name={screens.settings}
+        name="SettingsScreen"
         component={SettingsScreen}
-        options={{ title: 'Configuración' }}
+        options={{ 
+          title: 'Configuración',
+          headerBackTitle: 'Atrás'
+        }}
       />
     </Stack.Navigator>
   );

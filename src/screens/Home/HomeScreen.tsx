@@ -1,11 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 
-interface HomeScreenProps {
-  navigation: any;
-}
-
-export function HomeScreen({ navigation }: HomeScreenProps) {
+export function HomeScreen({ navigation }: any) {
   const options = [
     { id: 1, title: 'Convertir Divisas', screen: 'ConvertScreen', icon: '💱', color: '#3498db' },
     { id: 2, title: 'Historial', screen: 'HistoryScreen', icon: '📊', color: '#9b59b6' },

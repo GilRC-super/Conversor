@@ -13,12 +13,13 @@
 - **Asignatura/Profesor:** Desarrollo de Aplicaciones Móviles / M.C. Leonel González Vidales
 - **Periodo/Fecha:** Octubre 2025
 - **URL del Repositorio:**  (https://github.com/GilRC-super/Conversor)
+- **Desarrollador:** Gilberto Rebollar Carranza 
 
 ---
 
 ## 📖 Descripción
 
-**Convertidor de Divisas** es una aplicación móvil desarrollada con React Native y Expo que permite a los usuarios realizar conversiones entre diferentes monedas del mundo de forma rápida y sencilla. La aplicación cuenta con una interfaz moderna e intuitiva, con múltiples pantallas para diferentes funcionalidades.
+**Convertidor de Divisas** es una aplicación móvil desarrollada con React Native y Expo que permite a los usuarios realizar conversiones entre diferentes monedas del mundo utilizando tasas de cambio en tiempo real obtenidas de una API externa. La aplicación cuenta con persistencia de datos local, historial de conversiones, y una interfaz moderna e intuitiva.
 
 ---
 
@@ -120,6 +121,13 @@ Personalización de la aplicación con switches y opciones de usuario.
 - **React Native Screens:** ~4.16.0
 - **React Native Safe Area Context:** ~5.6.0
 
+### Persistencia de Datos
+- **AsyncStorage:** @react-native-async-storage/async-storage
+
+### API Externa
+- **ExchangeRate-API:** Tasas de cambio en tiempo real
+- **Fetch API:** Peticiones HTTP nativas
+
 ### Utilidades
 - **Expo Status Bar:** ~3.0.8
 
@@ -180,38 +188,46 @@ npx expo doctor
 
 ```
 currency-converter/
-├── App.tsx                      # Componente raíz de la aplicación
-├── app.json                     # Configuración de Expo
-├── package.json                 # Dependencias y scripts
-├── tsconfig.json                # Configuración de TypeScript
-├── assets/                      # Recursos estáticos
+├── App.tsx                          # Componente raíz con NavigationContainer
+├── app.json                         # Configuración de Expo
+├── package.json                     # Dependencias y scripts
+├── tsconfig.json                    # Configuración de TypeScript
+├── README.md                        # Este archivo
+├── .gitignore                       # Archivos ignorados por Git
+├── assets/                          # Recursos estáticos (iconos, splash)
 │   ├── adaptive-icon.png
 │   ├── favicon.png
 │   ├── icon.png
 │   └── splash.png
 └── src/
-    ├── navigations/             # Configuración de navegación
-    │   ├── AppNavigation.tsx    # Stack Navigator principal
-    │   └── index.ts             # Exportaciones
-    ├── screens/                 # Pantallas de la aplicación
+    ├── navigations/                 # Sistema de navegación
+    │   ├── AppNavigation.tsx        # Configuración del Stack Navigator
+    │   └── index.ts                 # Exportaciones
+    ├── screens/                     # Pantallas de la aplicación
     │   ├── Home/
-    │   │   ├── HomeScreen.tsx
+    │   │   ├── HomeScreen.tsx       # Pantalla principal con menú
     │   │   └── index.ts
     │   ├── Convert/
-    │   │   ├── ConvertScreen.tsx
+    │   │   ├── ConvertScreen.tsx    # Conversión con API en tiempo real
     │   │   └── index.ts
     │   ├── History/
-    │   │   ├── HistoryScreen.tsx
+    │   │   ├── HistoryScreen.tsx    # Historial desde base de datos
     │   │   └── index.ts
     │   ├── Rates/
-    │   │   ├── RatesScreen.tsx
+    │   │   ├── RatesScreen.tsx      # Tasas actuales con API
     │   │   └── index.ts
     │   └── Settings/
-    │       ├── SettingsScreen.tsx
+    │       ├── SettingsScreen.tsx   # Configuración y estadísticas
     │       └── index.ts
-    └── utils/                   # Utilidades y constantes
-        ├── screens.ts           # Nombres de pantallas
-        └── index.ts             # Exportaciones
+    ├── services/                    # Servicios y lógica de negocio
+    │   ├── api/
+    │   │   ├── currencyApi.ts       # Integración con ExchangeRate-API
+    │   │   └── index.ts
+    │   ├── storage.ts               # Base de datos con AsyncStorage
+    │   └── index.ts
+    └── utils/                       # Utilidades y constantes
+        ├── screens.ts               # Nombres de pantallas
+        └── index.ts
 ```
 
 ### Descripción de Componentes Principales

@@ -1,57 +1,141 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { getSupportedRates, getLastUpdateTime } from '../../services/api/currencyApi';
 
-interface Rate {
+interface RateWithInfo {
   code: string;
   name: string;
   flag: string;
+  symbol: string;
   rate: number;
-  change: number;
 }
 
 export function RatesScreen() {
-  const rates: Rate[] = [
-    { code: 'EUR', name: 'Euro', flag: '🇪🇺', rate: 0.92, change: -0.5 },
-    { code: 'GBP', name: 'Libra Esterlina', flag: '🇬🇧', rate: 0.79, change: 0.3 },
-    { code: 'JPY', name: 'Yen Japonés', flag: '🇯🇵', rate: 149.50, change: 1.2 },
-    { code: 'MXN', name: 'Peso Mexicano', flag: '🇲🇽', rate: 17.20, change: -0.8 },
-    { code: 'CAD', name: 'Dólar Canadiense', flag: '🇨🇦', rate: 1.36, change: 0.1 },
-    { code: 'AUD', name: 'Dólar Australiano', flag: '🇦🇺', rate: 1.52, change: 0.6 },
-    { code: 'CHF', name: 'Franco Suizo', flag: '🇨🇭', rate: 0.88, change: -0.2 },
-    { code: 'CNY', name: 'Yuan Chino', flag: '🇨🇳', rate: 7.24, change: 0.4 },
-  ];
+  const [rates, setRates] = useState<RateWithInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadRates();
+  }, []);
+
+  const loadRates = async () => {
+    try {
+      setLoading(true);
+      
+      // Cargar tasas
+      const ratesData = await getSupportedRates('USD');
+      
+      if (ratesData) {
+        setRates(ratesData);
+      }
+      
+      // Cargar timestamp
+      const updateTime = await getLastUpdateTime();
+      if (updateTime) {
+        const date = new Date(updateTime);
+        setLastUpdate(date.toLocaleString('es-MX'));
+      }
+    } catch (error) {
+      console.error('Error cargando tasas:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadRates();
+  };
+
+  // Calcular cambio aleatorio para demo (en producción, esto vendría de la API)
+  const getRandomChange = () => {
+    return (Math.random() * 2 - 1).toFixed(2);
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3498db" />
+          <Text style={styles.loadingText}>Cargando tasas actuales...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>💹 Tasas de Cambio</Text>
         <Text style={styles.subtitle}>Base: 1 USD</Text>
-        <Text style={styles.updated}>Actualizado hace 5 min</Text>
+        {lastUpdate && (
+          <Text style={styles.updated}>Actualizado: {lastUpdate}</Text>
+        )}
       </View>
       
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.listContainer}>
-        {rates.map((rate) => (
-          <View key={rate.code} style={styles.rateCard}>
-            <View style={styles.rateHeader}>
-              <Text style={styles.flag}>{rate.flag}</Text>
-              <View style={styles.rateInfo}>
-                <Text style={styles.currencyCode}>{rate.code}</Text>
-                <Text style={styles.currencyName}>{rate.name}</Text>
-              </View>
-            </View>
-            <View style={styles.rateDetails}>
-              <Text style={styles.rateValue}>{rate.rate.toFixed(4)}</Text>
-              <View style={[
-                styles.changeBadge,
-                rate.change >= 0 ? styles.positiveChange : styles.negativeChange
-              ]}>
-                <Text style={styles.changeText}>
-                  {rate.change >= 0 ? '↑' : '↓'} {Math.abs(rate.change)}%
-                </Text>
-              </View>
-            </View>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3498db']}
+            tintColor="#3498db"
+          />
+        }
+      >
+        {rates.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No se pudieron cargar las tasas</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadRates}>
+              <Text style={styles.retryText}>Reintentar</Text>
+            </TouchableOpacity>
           </View>
-        ))}
+        ) : (
+          rates.map((rate) => {
+            const change = parseFloat(getRandomChange());
+            return (
+              <View key={rate.code} style={styles.rateCard}>
+                <View style={styles.rateHeader}>
+                  <Text style={styles.flag}>{rate.flag}</Text>
+                  <View style={styles.rateInfo}>
+                    <Text style={styles.currencyCode}>{rate.code}</Text>
+                    <Text style={styles.currencyName}>{rate.name}</Text>
+                  </View>
+                </View>
+                <View style={styles.rateDetails}>
+                  <Text style={styles.rateValue}>
+                    {rate.symbol} {rate.rate.toFixed(4)}
+                  </Text>
+                  <View style={[
+                    styles.changeBadge,
+                    change >= 0 ? styles.positiveChange : styles.negativeChange
+                  ]}>
+                    <Text style={[
+                      styles.changeText,
+                      { color: change >= 0 ? '#27ae60' : '#e74c3c' }
+                    ]}>
+                      {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })
+        )}
+        
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            ℹ️ Desliza hacia abajo para actualizar las tasas
+          </Text>
+          <Text style={styles.infoSubtext}>
+            Las tasas se actualizan diariamente
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -61,6 +145,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#7f8c8d',
   },
   header: {
     padding: 20,
@@ -147,5 +241,43 @@ const styles = StyleSheet.create({
   changeText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#3498db',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  infoBox: {
+    backgroundColor: '#ecf0f1',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  infoSubtext: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    textAlign: 'center',
   },
 });

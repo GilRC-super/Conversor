@@ -3,6 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { AppNavigation } from './src/navigations';
 
 export default function App() {
+  console.log('🚀 App iniciando...'); 
+  
   return (
     <NavigationContainer>
       <AppNavigation />

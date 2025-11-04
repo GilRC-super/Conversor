@@ -1,39 +1,81 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
+import { saveConversion, Conversion } from '../../services/storage';
+import { convertCurrency, SUPPORTED_CURRENCIES, getExchangeRates } from '../../services/api/currencyApi';
 
 export function ConvertScreen() {
   const [amount, setAmount] = useState('');
   const [fromCurrency, setFromCurrency] = useState('USD');
   const [toCurrency, setToCurrency] = useState('EUR');
   const [result, setResult] = useState<string | null>(null);
+  const [rate, setRate] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
 
-  const currencies = [
-    { code: 'USD', name: 'Dólar', flag: '🇺🇸' },
-    { code: 'EUR', name: 'Euro', flag: '🇪🇺' },
-    { code: 'GBP', name: 'Libra', flag: '🇬🇧' },
-    { code: 'JPY', name: 'Yen', flag: '🇯🇵' },
-    { code: 'MXN', name: 'Peso MX', flag: '🇲🇽' },
-    { code: 'CAD', name: 'Dólar CA', flag: '🇨🇦' },
-  ];
-  
-  // Tasas de ejemplo (en producción usar API real)
-  const rates: { [key: string]: number } = {
-    USD: 1,
-    EUR: 0.92,
-    GBP: 0.79,
-    JPY: 149.50,
-    MXN: 17.20,
-    CAD: 1.36,
+  // Cargar tasas al iniciar
+  useEffect(() => {
+    loadRates();
+  }, []);
+
+  const loadRates = async () => {
+    try {
+      const rates = await getExchangeRates('USD');
+      if (rates) {
+        setRatesLoaded(true);
+        console.log('✅ Tasas cargadas');
+      } else {
+        Alert.alert(
+          'Sin Conexión',
+          'No se pudieron cargar las tasas. Verifica tu conexión a internet.',
+          [{ text: 'Reintentar', onPress: loadRates }]
+        );
+      }
+    } catch (error) {
+      console.error('Error cargando tasas:', error);
+    }
   };
 
-  const handleConvert = () => {
-    if (amount && fromCurrency && toCurrency) {
+  const handleConvert = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      Alert.alert('Error', 'Ingresa una cantidad válida');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
       const numAmount = parseFloat(amount);
-      if (!isNaN(numAmount)) {
-        const amountInUSD = numAmount / rates[fromCurrency];
-        const converted = amountInUSD * rates[toCurrency];
-        setResult(converted.toFixed(2));
+      
+      // Llamar a la API para convertir
+      const conversionResult = await convertCurrency(numAmount, fromCurrency, toCurrency);
+      
+      if (conversionResult) {
+        const { result: convertedAmount, rate: conversionRate } = conversionResult;
+        
+        setResult(convertedAmount.toString());
+        setRate(conversionRate);
+
+        // Guardar en base de datos
+        const conversion: Conversion = {
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          from: fromCurrency,
+          to: toCurrency,
+          amount: amount,
+          result: convertedAmount.toString(),
+          rate: conversionRate,
+        };
+
+        await saveConversion(conversion);
+        console.log('✅ Conversión guardada');
+      } else {
+        Alert.alert('Error', 'No se pudo realizar la conversión. Intenta de nuevo.');
       }
+    } catch (error) {
+      console.error('Error en conversión:', error);
+      Alert.alert('Error', 'Ocurrió un error al convertir. Verifica tu conexión.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,6 +84,7 @@ export function ConvertScreen() {
     setFromCurrency(toCurrency);
     setToCurrency(temp);
     setResult(null);
+    setRate(null);
   };
 
   return (
@@ -50,6 +93,13 @@ export function ConvertScreen() {
         <View style={styles.content}>
           <Text style={styles.title}>💱 Convertir Divisas</Text>
           
+          {!ratesLoaded && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3498db" />
+              <Text style={styles.loadingText}>Cargando tasas...</Text>
+            </View>
+          )}
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Cantidad a convertir</Text>
             <TextInput
@@ -58,20 +108,26 @@ export function ConvertScreen() {
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={setAmount}
+              editable={ratesLoaded}
             />
           </View>
 
           <View style={styles.currencySection}>
             <Text style={styles.label}>De:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
-              {currencies.map((curr) => (
+              {SUPPORTED_CURRENCIES.map((curr) => (
                 <TouchableOpacity
                   key={curr.code}
                   style={[
                     styles.currencyButton,
                     fromCurrency === curr.code && styles.selectedCurrency
                   ]}
-                  onPress={() => setFromCurrency(curr.code)}
+                  onPress={() => {
+                    setFromCurrency(curr.code);
+                    setResult(null);
+                    setRate(null);
+                  }}
+                  disabled={!ratesLoaded}
                 >
                   <Text style={styles.flag}>{curr.flag}</Text>
                   <Text style={[
@@ -88,7 +144,11 @@ export function ConvertScreen() {
           </View>
 
           <View style={styles.swapContainer}>
-            <TouchableOpacity style={styles.swapButton} onPress={swapCurrencies}>
+            <TouchableOpacity 
+              style={styles.swapButton} 
+              onPress={swapCurrencies}
+              disabled={!ratesLoaded}
+            >
               <Text style={styles.swapIcon}>⇅</Text>
             </TouchableOpacity>
           </View>
@@ -96,14 +156,19 @@ export function ConvertScreen() {
           <View style={styles.currencySection}>
             <Text style={styles.label}>A:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.currencyScroll}>
-              {currencies.map((curr) => (
+              {SUPPORTED_CURRENCIES.map((curr) => (
                 <TouchableOpacity
                   key={curr.code}
                   style={[
                     styles.currencyButton,
                     toCurrency === curr.code && styles.selectedCurrency
                   ]}
-                  onPress={() => setToCurrency(curr.code)}
+                  onPress={() => {
+                    setToCurrency(curr.code);
+                    setResult(null);
+                    setRate(null);
+                  }}
+                  disabled={!ratesLoaded}
                 >
                   <Text style={styles.flag}>{curr.flag}</Text>
                   <Text style={[
@@ -120,14 +185,21 @@ export function ConvertScreen() {
           </View>
 
           <TouchableOpacity 
-            style={[styles.convertButton, !amount && styles.disabledButton]} 
+            style={[
+              styles.convertButton, 
+              (!amount || !ratesLoaded || loading) && styles.disabledButton
+            ]} 
             onPress={handleConvert}
-            disabled={!amount}
+            disabled={!amount || !ratesLoaded || loading}
           >
-            <Text style={styles.convertButtonText}>Convertir</Text>
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.convertButtonText}>Convertir</Text>
+            )}
           </TouchableOpacity>
 
-          {result && (
+          {result && rate && (
             <View style={styles.resultContainer}>
               <Text style={styles.resultLabel}>Resultado:</Text>
               <Text style={styles.resultAmount}>
@@ -138,7 +210,10 @@ export function ConvertScreen() {
                 {result} {toCurrency}
               </Text>
               <Text style={styles.resultRate}>
-                Tasa: 1 {fromCurrency} = {(rates[toCurrency] / rates[fromCurrency]).toFixed(4)} {toCurrency}
+                Tasa: 1 {fromCurrency} = {rate.toFixed(4)} {toCurrency}
+              </Text>
+              <Text style={styles.resultTimestamp}>
+                ⏱️ Tasas actualizadas en tiempo real
               </Text>
             </View>
           )}
@@ -162,6 +237,15 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 30,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#7f8c8d',
   },
   inputContainer: {
     marginBottom: 25,
@@ -298,5 +382,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginTop: 15,
+  },
+  resultTimestamp: {
+    fontSize: 11,
+    color: '#95a5a6',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });
